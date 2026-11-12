@@ -67,7 +67,7 @@ function show(name, { text }, fresh) {
 
   const bases = Object.entries(checks.bases).map(([b, n]) => `${b}, for ${plural(n, "activity", "activities")}`).join("; ");
   $("how").innerHTML =
-    `Float in days is the file's total_float_hr_cnt divided by ${esc(bases)}. ` +
+    `Float in days is the file's total_float_hr_cnt divided by hours a day. Hours a day: ${esc(bases)}. ` +
     `Cross-check: for ${checks.units.agree} of ${checks.units.compared} activities, that matches the working days between the row's own early and late finish.`;
 }
 
