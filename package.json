@@ -1,0 +1,10 @@
+{
+  "name": "xer-check",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reads Primavera P6 .xer files, flags broken rows, and runs three schedule checks.",
+  "bin": { "xer-check": "check.js" },
+  "scripts": { "test": "node --test", "check": "node check.js samples/aspose-testXer.xer samples/hb-intel-Project_Schedule.xer" },
+  "license": "MIT"
+}
