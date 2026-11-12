@@ -73,9 +73,9 @@ export function buildModel(parsed) {
   /** Hours per working day for a calendar id, and a short note on where the figure came from. */
   function hoursPerDay(clndrId) {
     const own = clndrId ? calendars.get(clndrId) : null;
-    if (own?.dayHr) return { hpd: own.dayHr, basis: `calendar "${own.name}" day_hr_cnt` };
-    if (!own && projCal?.dayHr) return { hpd: projCal.dayHr, basis: `project calendar "${projCal.name}" day_hr_cnt (activity calendar blank or not found)` };
-    return { hpd: FALLBACK_HOURS_PER_DAY, basis: `fallback ${FALLBACK_HOURS_PER_DAY} h (no day_hr_cnt in the file)` };
+    if (own?.dayHr) return { hpd: own.dayHr, basis: `calendar "${own.name}", ${own.dayHr} h a day` };
+    if (!own && projCal?.dayHr) return { hpd: projCal.dayHr, basis: `project calendar "${projCal.name}", ${projCal.dayHr} h a day (the activity names no calendar)` };
+    return { hpd: FALLBACK_HOURS_PER_DAY, basis: `${FALLBACK_HOURS_PER_DAY} h a day, the fallback (no day_hr_cnt for this calendar in the file)` };
   }
 
   const acts = new Map();
@@ -202,7 +202,7 @@ export function unitsCheck(acts) {
 export function floatHistogram(acts, highFloatDays = HIGH_FLOAT_DAYS) {
   const bins = [
     { key: "neg", label: "Below 0", n: 0 },
-    { key: "zero", label: "0", n: 0 },
+    { key: "zero", label: "Exactly 0", n: 0 },
     { key: "low", label: "Over 0, up to 10", n: 0 },
     { key: "mid", label: `Over 10, up to ${highFloatDays}`, n: 0 },
     { key: "high", label: `Over ${highFloatDays}`, n: 0 },

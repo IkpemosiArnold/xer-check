@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>XER Check</title>
+<meta name="description" content="Reads Primavera P6 .xer files in the browser, flags broken rows with their line numbers, and runs three checks: missing links, negative float and high float.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fffcf7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1320">
+<link rel="icon" href="data:,">
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></symbol>
+  <symbol id="i-none" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2.2 2.2"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+<main class="shell">
+  <header class="top">
+    <p class="mark">XER Check</p>
+    <h1>Three checks on a P6 schedule. Every flag has a line number.</h1>
+  </header>
+
+  <div class="files" role="group" aria-label="Schedule file" id="files"></div>
+
+  <section class="reading" aria-live="polite">
+    <p class="docline" id="docline"></p>
+    <p class="summary" id="summary"><span class="sum-main">Reading the file</span></p>
+    <p class="chain" id="chain"></p>
+    <div class="rows" id="rows"></div>
+  </section>
+
+  <figure class="chart" id="chart" hidden></figure>
+  <p class="how" id="how"></p>
+
+  <section class="tool" aria-labelledby="own-h">
+    <h2 id="own-h">Check your own .xer</h2>
+    <p class="tool-sub">It is read in this tab. Nothing is uploaded.</p>
+    <label class="btn secondary file-btn">Choose a file<input type="file" id="own" accept=".xer,text/plain" class="sr"></label>
+    <p class="error" id="error" hidden></p>
+  </section>
+
+  <footer class="foot">
+    <p>Built on 12 Nov 2026 with AI coding agents, directed by Arnold Ikpemosi Adeyemi.</p>
+    <p>Sample files and their licences are listed in the README.</p>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
