@@ -16,7 +16,7 @@ No dependencies to install. Node 18 or later.
 node serve.js            # then open http://127.0.0.1:8772/
 node check.js samples/aspose-testXer.xer samples/hb-intel-Project_Schedule.xer
 node check.js my.xer --high 30 --json
-node --test              # 9 tests
+node --test              # 11 tests
 ```
 
 The page loads the two sample files below and has a button to check your own .xer. Your file is read in the browser tab and is not uploaded. The page is plain HTML, CSS and ES modules, so GitHub Pages can serve the folder as it is. Opening `index.html` straight from disk will not load the samples, because browsers block module scripts and fetch on `file://`. Serve the folder instead: `node serve.js` or `python3 -m http.server`.
@@ -39,11 +39,11 @@ Both files are byte-for-byte copies of the source at the commit in the link.
 | Broken rows | 12, all kept: CALENDAR lines 14 to 25 have last_chng_date "2/12/2004 3:19:00 PM", not XER date form | 0 |
 | Missing links | 4 of 83: A1000 has no links at all, A1010 has no predecessor, A1150 and A1820 have no successor | 32 of 281. Building B01 follows the award through the M and MOB activities. Buildings B02 to B10 are tied to nothing: Mobilization has no predecessor (9) and Temporary Relocation has no links at all (9). Demobilization has no successor in all 10 buildings. The other 4 are P-001 (the first activity), C-001, C-002 and VAC-B01. |
 | Negative float | 0 | 0 |
-| High float (over 44 days) | 5, from 108 to 125 days | 11: two closeout activities at 116 days and 9 relocations at 78 days. All 11 are also open ends. |
+| High float (over 44 days) | 5, from 108 to 125 days | 11: two closeout activities at 116 days and 9 relocations at 78 days. All eleven high-float activities also have missing links. That makes them worth investigating, but this checker does not establish the cause. |
 | Hours a day used | 8, from the project calendar "Standard" (every TASK row has a blank clndr_id) | 8, the fallback (no day_hr_cnt in the file) |
-| Units cross-check | 83 of 83 agree | 281 of 281 agree |
+| Weekday sanity check | 83 of 83 agree | 281 of 281 agree |
 
-Two notes. In the Aspose file, A1820 "Start up the business" is the last activity but is typed as a start milestone (TT_Mile), so the rule flags its missing successor. In the hb-intel file, 234 of 281 activities have exactly 43 days of float, one day under the high float line. They are buildings B02 to B10, 26 activities each. With no predecessor on Mobilization, all nine start on 2 Mar 2026, the first day of the project and a week before Contract Negotiation & Award starts. The high float check passes them; the missing links check explains them. `node check.js samples/hb-intel-Project_Schedule.xer --high 42` moves the count from 11 to 245.
+Two notes. In the Aspose file, A1820 "Start up the business" is the last activity but is typed as a start milestone (TT_Mile), so the rule flags its missing successor. In the hb-intel file, 234 of 281 activities have exactly 43 days of float, one day under the high float line. They are buildings B02 to B10, 26 activities each. With no predecessor on Mobilization, all nine start on 2 Mar 2026, the first day of the project and a week before Contract Negotiation & Award starts. The high float check passes them. The missing link on Mobilization is worth investigating, but this checker does not establish that it causes their float. `node check.js samples/hb-intel-Project_Schedule.xer --high 42` moves the count from 11 to 245.
 
 ## How it reads a file
 
@@ -65,11 +65,11 @@ Only activities that are not complete are judged. Level of effort (TT_LOE) and W
 
 - **Missing links.** An activity needs at least one predecessor and one successor. A start milestone (TT_Mile) may have no predecessor, and a finish milestone (TT_FinMile) may have no successor. Nothing else is excused. Links that were set aside as broken do not count.
 - **Negative float.** Total float below 0.
-- **High float.** Total float above 44 working days. 44 days is the line the DCMA 14-point schedule assessment uses: about two months of slack, which usually means a missing link.
+- **High float.** Total float above 44 working days. 44 days is the line the DCMA 14-point schedule assessment uses: about two months of slack. That much float is worth investigating. This checker does not establish the cause.
 
 Float comes from the file's own `total_float_hr_cnt`. It is in hours, so it is divided by the hours in a working day: the activity's calendar `day_hr_cnt`, else the project calendar's, else the default calendar's, else 8. The page and the command say which one was used. The comparison with 44 days is made in hours (44 times that calendar's hours a day) so rounding cannot move an activity across the line.
 
-**Units cross-check.** If the hours a day are right, float in days should equal the working days between the row's own early finish and late finish. The checker counts those days on a Monday to Friday calendar and reports how many agree. It ignores holidays, so it is a check on the unit, not a recompute of the schedule.
+**Weekday cross-check.** This is a sample-specific sanity check under a Monday-to-Friday, 8-hour assumption. It compares float in days with the whole weekdays between the row's own early finish and late finish, and reports how many agree. It reduces timestamps to whole Monday-to-Friday days, so it ignores shifts, holidays and partial days. It does not validate units or float in general, and it is not a recompute of the schedule.
 
 ## The chart
 
@@ -77,16 +77,16 @@ Total float in working days, one bar per band, for the selected file. The bands 
 
 ## What AI got wrong
 
-To make sure float in hours really meant 8-hour days, the agent wrote a cross-check: count the working days between each row's early finish and late finish, and compare with total_float_hr_cnt / 8. It compared dates only, and reported 40 rows that disagreed. That looked like a wrong unit or a file whose float could not be trusted.
+To sanity-check that float in hours meant 8-hour days, the agent wrote a cross-check: count the working days between each row's early finish and late finish, and compare with total_float_hr_cnt / 8. It compared dates only, and reported 40 rows that disagreed. That looked like a wrong unit or a file whose float could not be trusted.
 
-Reading those 40 rows showed the script was wrong, not the files. Four are milestones in the Aspose file with a late finish at 08:00, which is the same working moment as 17:00 the working day before. The other 36 are zero-length activities in the hb-intel file. That file writes a zero-length finish at 17:00 on the day before the start, so a Monday start gives a Sunday finish, on a calendar named 5 Day. In working time that is the close of Friday. The fix counts a finish at 08:00 or on a weekend as the close of the working day before. After it, 83 of 83 and 281 of 281 rows agree, and that agreement is what confirms the 8-hour unit for both files. A separate sign points the same way: the 5 Day calendar's clndr_data lists 08:00 to 12:00 and 13:00 to 17:00, Monday to Friday.
+Reading those 40 rows showed the script was wrong, not the files. Four are milestones in the Aspose file with a late finish at 08:00, which is the same working moment as 17:00 the working day before. The other 36 are zero-length activities in the hb-intel file. That file writes a zero-length finish at 17:00 on the day before the start, so a Monday start gives a Sunday finish, on a calendar named 5 Day. In working time that is the close of Friday. The fix counts a finish at 08:00 or on a weekend as the close of the working day before. After it, 83 of 83 and 281 of 281 rows agree: both samples agree under its weekday assumptions; that is a sanity check, not proof the calendars are right. A separate sign points the same way: the 5 Day calendar's clndr_data lists 08:00 to 12:00 and 13:00 to 17:00, Monday to Friday.
 
 The full log, with four more entries, is in [NOTES-ai-mistakes.md](NOTES-ai-mistakes.md).
 
 ## Limits
 
 - It trusts the file's float. It does not recompute the schedule, so a file whose float was never calculated will show its stale numbers.
-- The units cross-check assumes Monday to Friday and ignores holidays.
+- The weekday cross-check is a sample-specific sanity check under a Monday-to-Friday, 8-hour assumption. It reduces timestamps to whole weekdays, so it ignores shifts, holidays and partial days. It compares finishes only, while P6 can compute total float from start float, finish float, or the smaller of the two ([Oracle P6 help](https://docs.oracle.com/cd/G48897_01/p6help/en/90519.htm)). It does not validate units or float in general.
 - One project per file. Multi-project files are read, but links to tasks in other projects show up as broken rows.
 - Fonts: Geist and Newsreader (SIL Open Font License), latin subsets in `fonts/`, licences in `fonts/*-OFL.txt`.
 

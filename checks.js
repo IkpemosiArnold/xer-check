@@ -16,20 +16,27 @@ const CHECKED_TABLES = ["PROJECT", "CALENDAR", "TASK", "TASKPRED"];
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2})(?::(\d{2}))?)?$/;
 const NUM_RE = /^-?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/;
 
-/** True for "", or a real calendar date in XER form (yyyy-mm-dd, optional hh:mm[:ss]). */
+/**
+ * True for "", or a real calendar date in XER form (yyyy-mm-dd, optional hh:mm[:ss]).
+ * The day must exist (no 30 February), hours run 0 to 23, minutes and seconds 0 to 59.
+ */
 export function isXerDate(s) {
   if (s === "") return true;
   const m = DATE_RE.exec(s);
   if (!m) return false;
-  const [, y, mo, d, h = "0", mi = "0"] = m;
+  const [, y, mo, d, h = "0", mi = "0", sec = "0"] = m;
   const t = new Date(Date.UTC(+y, +mo - 1, +d));
-  return t.getUTCFullYear() === +y && t.getUTCMonth() === +mo - 1 && t.getUTCDate() === +d && +h < 24 && +mi < 60;
+  const realDay = t.getUTCFullYear() === +y && t.getUTCMonth() === +mo - 1 && t.getUTCDate() === +d;
+  return realDay && +h <= 23 && +mi <= 59 && +sec <= 59;
 }
 
-/** Number or null. "" is null (no value), anything unreadable is NaN. */
+/** Number or null. "" is null (no value). Anything unreadable, or too large to be finite (1e999), is NaN. */
 export function xerNum(s) {
   if (s == null || s === "") return null;
-  return NUM_RE.test(s.trim()) ? Number(s) : NaN;
+  const t = s.trim();
+  if (!NUM_RE.test(t)) return NaN;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
 }
 
 const isDateField = (f) => /_date2?$/.test(f);
@@ -170,6 +177,7 @@ const MONDAY = Date.UTC(2020, 0, 6);
 /**
  * The working day (Monday to Friday) whose close a P6 date-time marks.
  * A finish at 08:00 or earlier, or on a weekend, is the close of the working day before.
+ * Whole weekdays only: it knows nothing of shifts, holidays or partial days.
  */
 export function closeOfDay(dt) {
   const days = Math.round((Date.parse(dt.slice(0, 10) + "T00:00:00Z") - MONDAY) / DAY);
@@ -181,9 +189,12 @@ export function closeOfDay(dt) {
 }
 
 /**
- * Units cross-check. If hours per day is right, float in days equals the working days
- * between early finish and late finish, both read from the same row. Ignores holidays,
- * so it is a sanity check on the unit, not a recompute of the schedule.
+ * Weekday cross-check: a sample-specific sanity check under a Monday-to-Friday, 8-hour assumption.
+ * It compares float in days with the whole weekdays between the row's own early finish and
+ * late finish. It ignores shifts, holidays and partial days, and P6 can compute total float
+ * from start float, finish float or the smaller of the two, so this compares finishes only.
+ * Agreement is a sanity check on the two sample files, not proof that units, calendars or
+ * float are right in general.
  */
 export function unitsCheck(acts) {
   let agree = 0, compared = 0;

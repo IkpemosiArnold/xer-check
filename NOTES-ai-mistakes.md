@@ -2,11 +2,11 @@
 
 A running log kept while building this on 12 Nov 2026. Each entry is something the AI-written code, or a first assumption, got wrong, how it was caught, and the fix. Nothing here is made up.
 
-## 1. The units cross-check compared whole dates and called 40 good rows bad
+## 1. The weekday cross-check compared whole dates and called 40 good rows bad
 
-- **What was wrong.** To confirm that float in hours divided by 8 is really working days, the agent wrote a quick script: for each activity, count working days (Monday to Friday) between the row's early finish and late finish, and compare with total_float_hr_cnt / 8. It compared the date part only. It reported 40 mismatches: 4 of 83 in the Aspose file and 36 of 281 in the hb-intel file. That looked like either the wrong hours per day or a file whose float field could not be trusted.
+- **What was wrong.** To sanity-check that float in hours divided by 8 is working days, the agent wrote a quick script: for each activity, count working days (Monday to Friday) between the row's early finish and late finish, and compare with total_float_hr_cnt / 8. It compared the date part only. It reported 40 mismatches: 4 of 83 in the Aspose file and 36 of 281 in the hb-intel file. That looked like either the wrong hours per day or a file whose float field could not be trusted.
 - **How it was caught.** Reading the 40 rows. Every one had a clean float (0 h or 344 h) and a finish on a boundary. In the Aspose file, rows like A1200 had 0 h of float, early finish "2000-03-27 17:00" and late finish "2000-03-28 08:00": 08:00 the next morning is the same moment in working time as 17:00 the evening before, so float is 0, and the script said 1 day. In the hb-intel file, zero-length activities such as B02-022 had an early finish on Sunday "2026-06-07 17:00"; the script moved Sunday forward to Monday and got 42 days where the file says 43.
-- **Fix.** `closeOfDay` in `checks.js`: a finish at 08:00 or earlier, or on a weekend, counts as the close of the working day before. After the fix, 83 of 83 and 281 of 281 agree, which also confirms 8 hours a day for both files. A unit test pins the two edge cases.
+- **Fix.** `closeOfDay` in `checks.js`: a finish at 08:00 or earlier, or on a weekend, counts as the close of the working day before. After the fix, 83 of 83 and 281 of 281 agree: both samples agree under its weekday assumptions; that is a sanity check, not proof the calendars are right. A unit test pins the two edge cases.
 - **Commit.** The wrong version was a scratch script and never committed. The fix is in a6e9a1a.
 
 ## 2. Assumed every activity names its calendar
@@ -19,7 +19,7 @@ A running log kept while building this on 12 Nov 2026. Each entry is something t
 
 - **What was wrong.** The hours-per-day code expected a day_hr_cnt column.
 - **How it was caught.** The hb-intel CALENDAR table has only clndr_id, clndr_name, proj_id, clndr_type, clndr_data and default_flag.
-- **Fix.** Fall back to 8 h and say so on the page. The cross-check in entry 1 then showed 281 of 281 activities agree at 8 h, so the fallback is right for this file, not just a guess. Commit a6e9a1a.
+- **Fix.** Fall back to 8 h and say so on the page. The cross-check in entry 1 then showed 281 of 281 activities agree at 8 h under its weekday assumptions. That is a sanity check that the fallback fits this file, not proof the calendar is right. Commit a6e9a1a.
 
 ## 4. "Show all 32" showed up under a list that was already showing all 32
 

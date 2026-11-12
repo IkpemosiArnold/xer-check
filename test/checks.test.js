@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { checkXer, isXerDate, closeOfDay } from "../checks.js";
+import { checkXer, isXerDate, xerNum, closeOfDay } from "../checks.js";
 
 // A tiny XER built line by line, so line numbers in the assertions are easy to count.
 const T = (...cells) => cells.join("\t");
@@ -71,6 +71,37 @@ test("bad dates are flagged by field and the row is kept", () => {
   assert.equal(model.breaks[0].kind, "bad date");
   assert.equal(model.breaks[0].kept, true);
   assert.match(model.breaks[0].reason, /late_end_date/);
+});
+
+test("times out of range are bad dates: hours 0 to 23, minutes and seconds 0 to 59", () => {
+  assert.equal(isXerDate("2026-11-12 08:00:59"), true);
+  assert.equal(isXerDate("2026-11-12 23:59:59"), true);
+  assert.equal(isXerDate("2024-02-29 00:00"), true);
+  assert.equal(isXerDate("2026-11-12 08:00:99"), false);
+  assert.equal(isXerDate("2026-11-12 08:00:60"), false);
+  assert.equal(isXerDate("2026-11-12 08:60"), false);
+  assert.equal(isXerDate("2026-11-12 24:00"), false);
+  assert.equal(isXerDate("2026-02-29 08:00"), false);
+  assert.equal(isXerDate("2026-13-01"), false);
+  // In a file: the row is kept and the value is flagged.
+  const withDate = xer({ tasks: [task("1")] })
+    .replace("total_float_hr_cnt", "total_float_hr_cnt\tlate_end_date")
+    .replace(/(%R\t1\tA1\t[^\n]*)/, "$1\t2026-11-12 08:00:99");
+  const { model } = checkXer(withDate);
+  assert.deepEqual(model.breaks.map((b) => [b.line, b.kind, b.kept]), [[10, "bad date", true]]);
+  assert.equal(model.activities[0].lateEnd, null);
+});
+
+test("numbers that are not finite are bad numbers: 1e999, -1e999, NaN, Infinity", () => {
+  assert.equal(xerNum("1e3"), 1000);
+  assert.equal(xerNum(" -16 "), -16);
+  assert.equal(xerNum(""), null);
+  for (const v of ["1e999", "-1e999", "NaN", "Infinity", "-Infinity"]) assert.ok(Number.isNaN(xerNum(v)), v);
+  const { model, checks } = checkXer(xer({ tasks: [task("1", "TT_Task", "1e999"), task("2", "TT_Task", "NaN"), task("3", "TT_Task", "8")] }));
+  assert.deepEqual(model.breaks.map((b) => [b.line, b.kind]), [[10, "bad number"], [11, "bad number"]]);
+  assert.deepEqual(model.activities.map((a) => a.tfHr), [null, null, 8]);
+  assert.equal(checks.high.length, 0);
+  assert.equal(checks.noFloat, 2);
 });
 
 test("missing links: open ends flagged, start and finish milestones allowed, completed and LOE skipped", () => {

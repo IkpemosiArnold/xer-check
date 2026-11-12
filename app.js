@@ -13,6 +13,8 @@ const plural = (n, one, many = one + "s") => `${n.toLocaleString("en-GB")} ${n =
 const fmtDays = (d) => `${d.toLocaleString("en-GB", { maximumFractionDigits: 1 })} d`;
 
 let current = null;
+// Each load takes the next number. Only the latest load may draw, so a slow earlier load cannot overwrite a newer choice.
+let loadGen = 0;
 
 function fileButtons(active) {
   $("files").innerHTML = SAMPLES.map((s, i) =>
@@ -23,29 +25,61 @@ $("files").addEventListener("click", (e) => {
   if (b) loadSample(Number(b.dataset.i), true);
 });
 
+/** Remove the last file's findings and chart, so nothing old stays on screen. */
+function clearResults() {
+  current = null;
+  $("docline").textContent = "";
+  $("chain").textContent = "";
+  $("rows").innerHTML = "";
+  $("chart").innerHTML = "";
+  $("chart").hidden = true;
+  $("how").textContent = "";
+  $("error").hidden = true;
+}
+
+/** Start a load: mark the choice, clear the old results, show the loading line, and return this load's number. */
+function beginLoad(active) {
+  fileButtons(active);
+  clearResults();
+  $("summary").innerHTML = `<span class="sum-main">Reading the file</span>`;
+  return ++loadGen;
+}
+
+function loadFailed(title, detail) {
+  clearResults();
+  $("summary").innerHTML = `<span class="sum-main small">${esc(title)}</span>`;
+  $("chain").textContent = detail;
+}
+
 async function loadSample(i, fresh) {
-  fileButtons(i);
+  const gen = beginLoad(i);
   const s = SAMPLES[i];
   try {
     const res = await fetch(`samples/${s.file}`);
     if (!res.ok) throw new Error(res.status);
-    show(s.file, decodeXer(await res.arrayBuffer()), fresh);
+    const buf = await res.arrayBuffer();
+    if (gen !== loadGen) return;
+    show(s.file, decodeXer(buf), fresh);
   } catch {
-    $("summary").innerHTML = `<span class="sum-main small">Could not load the sample</span>`;
-    $("chain").textContent = "Serve this folder (node serve.js) rather than opening the file directly, or choose a file below.";
+    if (gen !== loadGen) return;
+    loadFailed("Could not load the sample", "Serve this folder (node serve.js) rather than opening the file directly, or choose a file below.");
   }
 }
 
 $("own").addEventListener("change", async (e) => {
   const f = e.target.files[0];
   if (!f) return;
-  $("error").hidden = true;
+  const gen = beginLoad(-1);
   try {
-    fileButtons(-1);
-    show(f.name, decodeXer(await f.arrayBuffer()), true);
+    const buf = await f.arrayBuffer();
+    if (gen !== loadGen) return;
+    show(f.name, decodeXer(buf), true);
     $("summary").scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
   } catch (err) {
-    $("error").textContent = `Could not read ${f.name}: ${err.message}`;
+    if (gen !== loadGen) return;
+    const msg = `Could not read ${f.name}: ${err.message}`;
+    loadFailed(`Could not read ${f.name}`, err.message);
+    $("error").textContent = msg;
     $("error").hidden = false;
   }
 });
@@ -70,8 +104,8 @@ function show(name, { text }, fresh) {
   $("how").innerHTML =
     `Float in days is the file's total_float_hr_cnt divided by hours a day. Hours a day: ${esc(bases)}. ` +
     (checks.units.compared
-      ? `Cross-check: for ${checks.units.agree} of ${checks.units.compared} activities, that matches the working days between the row's own early and late finish.`
-      : "Cross-check not run: no activity has a float value and both finish dates.");
+      ? `Weekday cross-check, a sample-specific sanity check under a Monday-to-Friday, 8-hour assumption: for ${checks.units.agree} of ${checks.units.compared} activities, float matches the whole weekdays between the row's own early and late finish. It ignores shifts, holidays and partial days, so agreement is a sanity check, not proof the calendars are right.`
+      : "Weekday cross-check not run: no activity has a float value and both finish dates.");
 }
 
 /* The four rows: broken rows first, then the three checks */
@@ -109,7 +143,7 @@ function renderRows(model, checks, fresh) {
       key: "high", term: "High float",
       status: noActs || noFloat ? notRun : checks.high.length ? ["fail", "cross", "Flag"] : ["pass", "check", "Clear"],
       value: noActs ? "No activities to check" : noFloat ? "No float values in this file" : (checks.high.length ? `${plural(checks.high.length, "activity", "activities")} over ${HIGH_FLOAT_DAYS} days` : `None over ${HIGH_FLOAT_DAYS} days`) + floatNote,
-      rule: `Rule: total float above ${HIGH_FLOAT_DAYS} working days, the line the DCMA 14-point assessment uses. That much float usually means a missing link, not real slack.`,
+      rule: `Rule: total float above ${HIGH_FLOAT_DAYS} working days, the line the DCMA 14-point assessment uses. That much float is worth investigating. This checker does not establish the cause.`,
       body: () => actList(checks.high, (a) => fmtDays(a.tfDays), true),
     },
   ];

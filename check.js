@@ -27,7 +27,7 @@ for (const f of files) {
   const p = (s = "") => console.log(s);
   p(`${basename(f)}  ${model.project.name}  ${model.activities.length} activities, ${model.rels.length} links, ${model.rowCount} rows, ${encoding}`);
   p(`  Units: ${Object.entries(checks.bases).map(([b, n]) => `${n} on ${b}`).join("; ")}`);
-  p(`  Units cross-check: float matches late minus early finish for ${checks.units.agree} of ${checks.units.compared}`);
+  p(`  Weekday sanity check (Monday-to-Friday, 8-hour assumption): float matches late minus early finish for ${checks.units.agree} of ${checks.units.compared}`);
   p(`  Broken rows: ${model.breaks.length}`);
   for (const b of model.breaks) p(`    line ${b.line}  ${b.table}  ${b.kind}: ${b.reason}`);
   p(`  Missing links: ${checks.openEnds.length} of ${checks.judged} judged activities`);
