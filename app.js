@@ -60,7 +60,8 @@ function show(name, { text }, fresh) {
   $("summary").innerHTML =
     `<span class="sum-main">${plural(flagged.size, "activity", "activities")} flagged</span>` +
     `<span class="sum-side ${model.breaks.length ? (setAside ? "fail" : "") : "muted"}">${plural(model.breaks.length, "broken row")}</span>`;
-  $("chain").textContent = `${plural(checks.openEnds.length, "open end")}, ${checks.negative.length} with negative float, ${checks.high.length} over ${HIGH_FLOAT_DAYS} days of float.`;
+  const both = checks.openEnds.length + checks.negative.length + checks.high.length - flagged.size;
+  $("chain").textContent = `${plural(checks.openEnds.length, "open end")}, ${checks.negative.length} with negative float, ${checks.high.length} over ${HIGH_FLOAT_DAYS} days of float.${both ? ` ${both} appear under more than one check.` : ""}`;
 
   renderRows(model, checks, fresh);
   renderChart(checks);
@@ -68,11 +69,18 @@ function show(name, { text }, fresh) {
   const bases = Object.entries(checks.bases).map(([b, n]) => `${b}, for ${plural(n, "activity", "activities")}`).join("; ");
   $("how").innerHTML =
     `Float in days is the file's total_float_hr_cnt divided by hours a day. Hours a day: ${esc(bases)}. ` +
-    `Cross-check: for ${checks.units.agree} of ${checks.units.compared} activities, that matches the working days between the row's own early and late finish.`;
+    (checks.units.compared
+      ? `Cross-check: for ${checks.units.agree} of ${checks.units.compared} activities, that matches the working days between the row's own early and late finish.`
+      : "Cross-check not run: no activity has a float value and both finish dates.");
 }
 
 /* The four rows: broken rows first, then the three checks */
 function renderRows(model, checks, fresh) {
+  // No false "Clear": a check with nothing to check says so.
+  const notRun = ["none", "none", "Not run"];
+  const noActs = checks.judged === 0;
+  const noFloat = !noActs && checks.noFloat === checks.judged;
+  const floatNote = !noActs && checks.noFloat ? `, ${checks.noFloat} with no float value` : "";
   const kept = model.breaks.filter((b) => b.kept).length;
   const aside = model.breaks.length - kept;
   const rows = [
@@ -85,22 +93,22 @@ function renderRows(model, checks, fresh) {
     },
     {
       key: "links", term: "Missing links",
-      status: checks.openEnds.length ? ["fail", "cross", "Flag"] : ["pass", "check", "Clear"],
-      value: checks.openEnds.length ? `${plural(checks.openEnds.length, "open end")} of ${checks.judged}` : "Every activity has both ends tied",
+      status: noActs ? notRun : checks.openEnds.length ? ["fail", "cross", "Flag"] : ["pass", "check", "Clear"],
+      value: noActs ? "No activities to check" : checks.openEnds.length ? `${plural(checks.openEnds.length, "open end")} of ${checks.judged}` : "Every activity has both ends tied",
       rule: "Rule: an activity that is not complete needs a predecessor and a successor. A start milestone may have no predecessor and a finish milestone no successor. Level of effort and WBS summary activities are skipped.",
       body: () => actList(checks.openEnds, (a) => a.missing),
     },
     {
       key: "neg", term: "Negative float",
-      status: checks.negative.length ? ["fail", "cross", "Flag"] : ["pass", "check", "Clear"],
-      value: checks.negative.length ? `${plural(checks.negative.length, "activity", "activities")} below 0` : "No activity below 0 days",
+      status: noActs || noFloat ? notRun : checks.negative.length ? ["fail", "cross", "Flag"] : ["pass", "check", "Clear"],
+      value: noActs ? "No activities to check" : noFloat ? "No float values in this file" : (checks.negative.length ? `${plural(checks.negative.length, "activity", "activities")} below 0` : "No activity below 0 days") + floatNote,
       rule: "Rule: total float below 0, read from total_float_hr_cnt. Negative float means a date cannot be met as the logic stands.",
       body: () => actList(checks.negative, (a) => fmtDays(a.tfDays), true),
     },
     {
       key: "high", term: "High float",
-      status: checks.high.length ? ["fail", "cross", "Flag"] : ["pass", "check", "Clear"],
-      value: checks.high.length ? `${plural(checks.high.length, "activity", "activities")} over ${HIGH_FLOAT_DAYS} days` : `None over ${HIGH_FLOAT_DAYS} days`,
+      status: noActs || noFloat ? notRun : checks.high.length ? ["fail", "cross", "Flag"] : ["pass", "check", "Clear"],
+      value: noActs ? "No activities to check" : noFloat ? "No float values in this file" : (checks.high.length ? `${plural(checks.high.length, "activity", "activities")} over ${HIGH_FLOAT_DAYS} days` : `None over ${HIGH_FLOAT_DAYS} days`) + floatNote,
       rule: `Rule: total float above ${HIGH_FLOAT_DAYS} working days, the line the DCMA 14-point assessment uses. That much float usually means a missing link, not real slack.`,
       body: () => actList(checks.high, (a) => fmtDays(a.tfDays), true),
     },

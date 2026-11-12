@@ -30,5 +30,5 @@ A running log kept while building this on 12 Nov 2026. Each entry is something t
 ## 5. Assumed a public .xer on GitHub is a P6 export
 
 - **What was wrong.** The first search results looked like schedules, so the plan was to take the first two with a licence.
-- **How it was caught.** Opening them. Several were small files built by hand or by a script for tests (one had an %E end-of-file marker in the middle, others were named "synthetic"). Even the Aspose file, which has a P6 8.3 header, carries calendar dates in a US format ("2/12/2004 3:19:00 PM") and blank user fields, which a P6 export would not write. It was most likely written by a converter.
+- **How it was caught.** Opening them. Several were small files built by hand or by a script for tests (one had an %E end-of-file marker in the middle, others were named "synthetic"). Even the Aspose file, which has a P6 8.3 header, carries calendar dates in a US format ("2/12/2004 3:19:00 PM") and a blank user name in the header line, which a P6 export would not write. It was most likely written by a converter.
 - **Fix.** Chose files with a clear licence and real schedule content, and the README says what each file probably is rather than calling both P6 exports.
